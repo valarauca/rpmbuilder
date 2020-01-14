@@ -29,4 +29,4 @@ Naturally `-H` and `--help` will attempt to provide some help.
 
 # Config
 
-Below is an example configuration
+You can find an example configuration within `examples`.
