@@ -1,0 +1,14 @@
+[rpm]
+name = "mosml"
+version = "21.0.2"
+license = "bsd-3 clause"
+arch = "x64"
+desc = "moscow sml compiler"
+gzip = true
+
+[contents]
+"mosml_build_output/usr/local/bin/mosmlc" = { dst = "/usr/local/bin/mosmlc", user = "root", group = "root", mode = Oo755 }
+mosml_build_output/usr/local/bin/mosmlyacc = { dst = "/usr/local/bin/mosmlyacc", user = "root", group = "root", mode = Oo755 }
+
+[changelog]
+2020-01-13T00:00:00 = { author = "valarauca", entry = "created first packaging manifest" }
