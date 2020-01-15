@@ -1,3 +1,4 @@
+use super::errors::Err;
 use super::rpm::{RPMBuilder, RPMError};
 use super::serde::{Deserialize, Serialize};
 
@@ -9,15 +10,23 @@ pub struct Scripts {
 }
 impl Scripts {
     /// constructs a lambda to produce the next stage of the build
-    pub fn build<'a>(&'a self) -> impl FnOnce(RPMBuilder) -> Result<RPMBuilder, RPMError> + 'a {
-        move |arg: RPMBuilder| -> Result<RPMBuilder, RPMError> {
+    pub fn build<'a>(&'a self) -> impl FnOnce(RPMBuilder, Err) -> Result<RPMBuilder, Err> + 'a {
+        move |arg: RPMBuilder, err: Err| -> Result<RPMBuilder, Err> {
             let mut arg: RPMBuilder = arg;
-            arg = match Scripts::load(&self.post_install) {
+
+            arg = match Scripts::load(
+                &self.post_install,
+                err.clone().note("post_install_path", &self.post_install),
+            ) {
                 Err(e) => return Err(e),
                 Ok(Option::None) => arg,
                 Ok(Option::Some(post_install)) => arg.post_install_script(post_install),
             };
-            arg = match Scripts::load(&self.pre_uninstall) {
+
+            arg = match Scripts::load(
+                &self.pre_uninstall,
+                err.clone().note("post_uninstall_path", &self.pre_uninstall),
+            ) {
                 Err(e) => return Err(e),
                 Ok(Option::None) => arg,
                 Ok(Option::Some(pre_uninstall)) => arg.pre_uninstall_script(pre_uninstall),
@@ -27,7 +36,7 @@ impl Scripts {
     }
 
     /// attempts to load a script from the file system
-    fn load(arg: &Option<String>) -> Result<Option<String>, RPMError> {
+    fn load(arg: &Option<String>, err: Err) -> Result<Option<String>, Err> {
         use std::fs::read_to_string;
 
         let path = match arg {
@@ -36,7 +45,7 @@ impl Scripts {
         };
         match read_to_string(path) {
             Ok(contents) => Ok(Some(contents)),
-            Err(e) => Err(RPMError::from(e)),
+            Err(e) => Err(err.note("failed to read script", e)),
         }
     }
 }

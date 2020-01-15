@@ -1,6 +1,6 @@
-use super::rpm::{RPMBuilder,Compressor};
+use super::libflate::gzip::Encoder;
+use super::rpm::{Compressor, RPMBuilder};
 use super::serde::{Deserialize, Serialize};
-use super::libflate::gzip::{Encoder};
 
 /// RPM these are required fields for initializing an RPM package build
 #[derive(Clone, Hash, Debug, Deserialize, Serialize, Default)]
@@ -26,7 +26,9 @@ impl RPM {
 
         // check if we should gzip compress this
         builder = match &self.gzip {
-            &Option::Some(true) => builder.compression(Compressor::Gzip(Encoder::new(Vec::new()).unwrap())),
+            &Option::Some(true) => {
+                builder.compression(Compressor::Gzip(Encoder::new(Vec::new()).unwrap()))
+            }
             _ => builder,
         };
 

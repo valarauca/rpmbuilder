@@ -1,6 +1,6 @@
 [package]
 name = "rpmbuilder"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["William Laeder <codylaeder@gmail.com>"]
 edition = "2018"
 
@@ -13,3 +13,4 @@ toml = "0.5"
 chrono = { version = "0.4", features = ["serde"] }
 clap = "2.33.0"
 libflate = "0.1.27"
+errors = { git = "https://github.com/valarauca/errors", version = "=3.0.4" }

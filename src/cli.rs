@@ -45,22 +45,20 @@ pub enum AppWork<'a> {
     Package(Package<'a>),
 }
 impl<'a> AppWork<'a> {
-
     pub fn from_args(arg: &'a ArgMatches<'a>) -> AppWork<'a> {
         match arg.subcommand() {
-            ("fmt", Option::Some(ref args)) => {
-                AppWork::Format(Format{config: args.value_of("config").unwrap() })
-            },
-            ("pkg", Option::Some(ref args)) => {
-                AppWork::Package(Package{config: args.value_of("config").unwrap(), output: args.value_of("output").unwrap() })
-            },
-            (idk,_) => {
-                panic!("unrecongized subcommand: {}", idk)
-            }
+            ("fmt", Option::Some(ref args)) => AppWork::Format(Format {
+                config: args.value_of("config").unwrap(),
+            }),
+            ("pkg", Option::Some(ref args)) => AppWork::Package(Package {
+                config: args.value_of("config").unwrap(),
+                output: args.value_of("output").unwrap(),
+            }),
+            (idk, _) => panic!("unrecongized subcommand: {}", idk),
         }
     }
 
-    pub fn work(&self) -> Result<(),String> {
+    pub fn work(&self) -> Result<(), String> {
         match self {
             &Self::Format(ref fmt) => fmt.work(),
             &Self::Package(ref pkg) => pkg.work(),
@@ -97,14 +95,15 @@ impl<'a> Format<'a> {
                 ))
             }
         };
-        let output =
-            match to_string_pretty(&values) {
-                Ok(data) => data,
-                Err(e) => return Err(format!(
+        let output = match to_string_pretty(&values) {
+            Ok(data) => data,
+            Err(e) => {
+                return Err(format!(
                     "post loading config:'{}' encounter toml error while serializing. error:'{:?}'",
                     self.config, e
-                )),
-            };
+                ))
+            }
+        };
         match write(self.config, output.as_bytes()) {
             Ok(()) => Ok(()),
             Err(e) => Err(format!(

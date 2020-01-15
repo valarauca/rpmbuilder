@@ -1,3 +1,7 @@
+use std::env::current_dir;
+use std::path::{Path, PathBuf};
+
+use super::errors::Err;
 use super::rpm::{RPMBuilder, RPMError, RPMFileOptions, RPMFileOptionsBuilder};
 use super::serde::{Deserialize, Serialize};
 
@@ -14,8 +18,8 @@ impl FileOptions {
     pub fn build<'a>(
         &'a self,
         src: &'a str,
-    ) -> impl FnOnce(RPMBuilder) -> Result<RPMBuilder, RPMError> + 'a {
-        move |builder: RPMBuilder| -> Result<RPMBuilder, RPMError> {
+    ) -> impl FnOnce(RPMBuilder, Err) -> Result<RPMBuilder, Err> + 'a {
+        move |builder: RPMBuilder, err: Err| -> Result<RPMBuilder, Err> {
             let opts = match &self {
                 &Self::Simple(ref dst) => RPMFileOptions::new(dst),
                 &Self::Complex(ref complex) => {
@@ -28,7 +32,13 @@ impl FileOptions {
                     complex.is_config(opts)
                 }
             };
-            builder.with_file(src, opts)
+            match builder.with_file(src, opts) {
+                Ok(x) => Ok(x),
+                Err(e) => Err(err.clone().note("src", src.to_string()).err(
+                    format_args!("{:?}", e),
+                    format!("failed to load src: {:?}", src.to_string()),
+                )),
+            }
         }
     }
 }
