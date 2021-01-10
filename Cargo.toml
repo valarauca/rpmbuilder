@@ -1,16 +1,16 @@
 [package]
 name = "rpmbuilder"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["William Laeder <codylaeder@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rpm-rs = "0.2.1"
+rpm-rs = "0.6.0"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 chrono = { version = "0.4", features = ["serde"] }
 clap = "2.33.0"
-libflate = "0.1.27"
-errors = { git = "https://github.com/valarauca/errors", version = "=3.0.4" }
+libflate = "1"
+errors = { git = "https://github.com/valarauca/errors" }

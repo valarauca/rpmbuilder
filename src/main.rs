@@ -15,6 +15,7 @@ mod core;
 mod fileopts;
 mod rpm_meta;
 mod scripts;
+mod sign;
 mod versions;
 use self::cli::{cli_build, AppWork};
 

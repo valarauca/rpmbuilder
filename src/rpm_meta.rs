@@ -27,7 +27,7 @@ impl RPM {
         // check if we should gzip compress this
         builder = match &self.gzip {
             &Option::Some(true) => {
-                builder.compression(Compressor::Gzip(Encoder::new(Vec::new()).unwrap()))
+                builder.compression(Compressor::Gzip(Encoder::new(Vec::with_capacity(4096)).unwrap()))
             }
             _ => builder,
         };

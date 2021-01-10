@@ -14,31 +14,27 @@ pub enum FileOptions {
     Complex(ComplexFileOptions),
 }
 impl FileOptions {
-    /// constructs a lambda which can be invoked on the final builder.
+    /// constructs a lambda expression which contains all the options to add
+    /// this entry into the final RPM
     pub fn build<'a>(
         &'a self,
-        src: &'a str,
-    ) -> impl FnOnce(RPMBuilder, Err) -> Result<RPMBuilder, Err> + 'a {
-        move |builder: RPMBuilder, err: Err| -> Result<RPMBuilder, Err> {
-            let opts = match &self {
-                &Self::Simple(ref dst) => RPMFileOptions::new(dst),
-                &Self::Complex(ref complex) => {
-                    let mut opts = RPMFileOptions::new(&complex.dst);
-                    opts = complex.user(opts);
-                    opts = complex.group(opts);
-                    opts = complex.symlink(opts);
-                    opts = complex.mode(opts);
-                    opts = complex.is_doc(opts);
-                    complex.is_config(opts)
-                }
-            };
-            match builder.with_file(src, opts) {
-                Ok(x) => Ok(x),
-                Err(e) => Err(err.clone().note("src", src.to_string()).err(
-                    format_args!("{:?}", e),
-                    format!("failed to load src: {:?}", src.to_string()),
-                )),
-            }
+        source: &'a str,
+    ) -> impl FnOnce(Result<RPMBuilder, Err>, &Err) -> Result<RPMBuilder, Err> + 'a {
+        move |builder_result, err| -> Result<RPMBuilder, Err> {
+            builder_result?
+                .with_file(source, self.make_opts())
+                .map_err(|e| {
+                    err.clone()
+                        .note("failed to load src", format_args!("{:?}", e))
+                        .note("src", source.to_string())
+                })
+        }
+    }
+
+    fn make_opts(&self) -> RPMFileOptionsBuilder {
+        match self {
+            &FileOptions::Simple(ref dst) => RPMFileOptions::new(dst.to_string()),
+            &FileOptions::Complex(ref cmp) => cmp.build(),
         }
     }
 }
@@ -61,41 +57,34 @@ pub struct ComplexFileOptions {
     pub config: Option<bool>,
 }
 impl ComplexFileOptions {
-    fn user(&self, arg: RPMFileOptionsBuilder) -> RPMFileOptionsBuilder {
-        match &self.user {
-            &Option::Some(ref user) => arg.user(user),
-            &Option::None => arg,
+    fn build(&self) -> RPMFileOptionsBuilder {
+        let mut opts = RPMFileOptions::new(&self.dst.clone());
+        opts = (Self::add_optional(&self.user, RPMFileOptionsBuilder::user))(opts);
+        opts = (Self::add_optional(&self.group, RPMFileOptionsBuilder::group))(opts);
+        opts = (Self::add_optional(&self.symlink, RPMFileOptionsBuilder::symlink))(opts);
+        opts = (Self::add_optional(&self.mode, RPMFileOptionsBuilder::mode))(opts);
+        if self.doc == Option::Some(true) {
+            opts = opts.is_doc();
         }
+        if self.config == Option::Some(true) {
+            opts = opts.is_config();
+        }
+        opts
     }
 
-    fn group(&self, arg: RPMFileOptionsBuilder) -> RPMFileOptionsBuilder {
-        match &self.group {
-            &Option::Some(ref group) => arg.group(group),
-            &Option::None => arg,
-        }
-    }
-    fn symlink(&self, arg: RPMFileOptionsBuilder) -> RPMFileOptionsBuilder {
-        match &self.symlink {
-            &Option::Some(ref symlink) => arg.symlink(symlink),
-            &Option::None => arg,
-        }
-    }
-    fn mode(&self, arg: RPMFileOptionsBuilder) -> RPMFileOptionsBuilder {
-        match &self.mode {
-            &Option::Some(ref mode) => arg.mode(*mode),
-            &Option::None => arg,
-        }
-    }
-    fn is_doc(&self, arg: RPMFileOptionsBuilder) -> RPMFileOptionsBuilder {
-        match &self.doc {
-            &Option::Some(true) => arg.is_doc(),
-            _ => arg,
-        }
-    }
-    fn is_config(&self, arg: RPMFileOptionsBuilder) -> RPMFileOptionsBuilder {
-        match &self.config {
-            &Option::Some(true) => arg.is_config(),
-            _ => arg,
+    fn add_optional<'a, T, F>(
+        arg: &'a Option<T>,
+        lambda: F,
+    ) -> impl Fn(RPMFileOptionsBuilder) -> RPMFileOptionsBuilder + 'a
+    where
+        F: Fn(RPMFileOptionsBuilder, T) -> RPMFileOptionsBuilder + 'static,
+        T: Clone,
+    {
+        move |builder: RPMFileOptionsBuilder| -> RPMFileOptionsBuilder {
+            match arg {
+                &Option::None => builder,
+                &Option::Some(ref arg) => lambda(builder, arg.clone()),
+            }
         }
     }
 }

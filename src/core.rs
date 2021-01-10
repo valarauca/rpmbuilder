@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 
 use super::chrono::NaiveDateTime;
 use super::errors::Err;
-use super::rpm::{RPMBuilder, RPMError, RPMPackage};
+use super::rpm::{Dependency, RPMBuilder, RPMError, RPMPackage};
 use super::serde::{Deserialize, Serialize};
 
 use super::changelog::ChangeLogEntry;
 use super::fileopts::FileOptions;
 use super::rpm_meta::RPM;
 use super::scripts::Scripts;
+use super::sign::Sign;
 use super::versions::into_dependency;
 
 /// ConfigFile is the top level format for specifying how to
@@ -31,6 +32,8 @@ pub struct ConfigFile {
     pub provides: BTreeMap<String, String>,
     #[serde(default)]
     pub scripts: Option<Scripts>,
+    #[serde(default)]
+    pub signature: Option<Sign>,
 }
 impl ConfigFile {
     /// build the RPM in memory
@@ -43,48 +46,46 @@ impl ConfigFile {
             .note("desc", &self.rpm.desc);
 
         // package the contents
-        for (k, v) in self.contents.iter() {
-            let lambda = v.build(k);
-            builder = match lambda(builder, err.clone().note("key", v).note("value", v)) {
-                Ok(builder) => builder,
-                Err(e) => return Err(e),
-            };
-        }
+        builder = self
+            .contents
+            .iter()
+            .map(|(source, options)| options.build(source))
+            .fold(Ok(builder), |builder_res, opts_bundle| {
+                (opts_bundle)(builder_res, &err)
+            })?;
 
         // package the change log
-        for (time, entry) in self.changelog.iter() {
-            builder = entry.build(time)(builder);
-        }
+        builder = self
+            .changelog
+            .iter()
+            .map(|(time, entry)| entry.build(time))
+            .fold(builder, |b, e| (e)(b));
 
         // package database interactions
-        for (name, version) in self.requires.iter() {
-            builder = builder.requires(into_dependency(name, version));
-        }
-        for (name, version) in self.obsoletes.iter() {
-            builder = builder.obsoletes(into_dependency(name, version));
-        }
-        for (name, version) in self.conflicts.iter() {
-            builder = builder.conflicts(into_dependency(name, version));
-        }
-        for (name, version) in self.provides.iter() {
-            builder = builder.provides(into_dependency(name, version));
-        }
+        builder = (add_rpm_db_interaction(self.requires.iter(), RPMBuilder::requires))(builder);
+        builder = (add_rpm_db_interaction(self.obsoletes.iter(), RPMBuilder::obsoletes))(builder);
+        builder = (add_rpm_db_interaction(self.conflicts.iter(), RPMBuilder::conflicts))(builder);
+        builder = (add_rpm_db_interaction(self.provides.iter(), RPMBuilder::provides))(builder);
 
         // load scripts if we need to
-        builder = match &self.scripts {
-            &Option::None => builder,
-            &Option::Some(ref scripts) => {
-                let err = err.clone().note("scripts", scripts);
-                let lambda = scripts.build();
-                match lambda(builder, err) {
-                    Ok(builder) => builder,
-                    Err(e) => return Err(e),
-                }
-            }
-        };
-        match builder.build() {
-            Ok(x) => Ok(x),
-            Err(e) => Err(err.note("failed to build", format_args!("{:?}", e))),
-        }
+        builder = (Scripts::build(&self.scripts))(builder, &err)?;
+
+        // signing occurs last
+        let finalizer = Sign::build(&self.signature);
+        finalizer(builder, &err).map_err(|e| e.note("sucess", false))
+    }
+}
+
+fn add_rpm_db_interaction<'a, I, F>(
+    iter: I,
+    lambda: F,
+) -> impl FnOnce(RPMBuilder) -> RPMBuilder + 'a
+where
+    I: Iterator<Item = (&'a String, &'a String)> + 'a,
+    F: Fn(RPMBuilder, Dependency) -> RPMBuilder + 'static,
+{
+    move |builder| -> RPMBuilder {
+        iter.map(|(name, version)| into_dependency(name, version))
+            .fold(builder, |builder, dep| lambda(builder, dep))
     }
 }

@@ -3,7 +3,7 @@ rpm_builder
 
 This is a project that builds RPMS (or it should).
 
-It is fancy wrapping around the [rpm-rs](https://docs.rs/crate/rpm-rs/0.2.1).
+It is fancy wrapper around the [rpm-rs](https://docs.rs/crate/rpm-rs/0.6.0).
 Namely this project builds an executable file which can
 consume a `.toml` file which declares the contents of
 and RPM. 
